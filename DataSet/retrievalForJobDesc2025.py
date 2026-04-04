@@ -62,3 +62,12 @@ hard_skill_counts = skill_counts[skill_counts.index.isin(hard_skills)]
 
 print("\nTop 30 hard/technical skills:")
 print(hard_skill_counts.head(30))
+
+hard_skill_pct = (hard_skill_counts.head(30) / len(df_tech) * 100).round(1)
+hard_skill_pct = hard_skill_pct.astype(str) + '%'
+
+print("\nTop 30 hard/technical skills (% of tech job postings):")
+print(hard_skill_pct.to_string())
+
+#Extract Keywords
+
