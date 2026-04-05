@@ -70,29 +70,39 @@ hard_skill_pct = hard_skill_pct.astype(str) + '%'
 # print("\nTop 30 hard/technical skills (% of tech job postings):")
 # print(hard_skill_pct.to_string())
 
-# Extract what skills are most prominent in what jobs
-df['Skills'] = df['Skills'].str.replace(';', ' ', regex=False)
 
-# Group skills by job title
-title_skills = df.groupby('Title')['Skills'].apply(
-    lambda x: ' '.join(x.dropna())
+# Split on semicolons and clean each skill — keep as whole phrases
+df['Skills_list'] = df['Skills'].str.split(';').apply(
+    lambda x: [s.strip().lower() for s in x] if isinstance(x, list) else []
+)
+
+# Join skills with a unique separator so TF-IDF treats each skill as one token
+# Replace spaces within skills with underscores so "machine learning" → "machine_learning"
+df['Skills_clean'] = df['Skills_list'].apply(
+    lambda skills: ' '.join([s.replace(' ', '_') for s in skills])
+)
+
+# Group by title
+title_skills = df.groupby('Title')['Skills_clean'].apply(
+    lambda x: ' '.join(x)
 ).reset_index()
 
-# Apply TF-IDF
+# TF-IDF on whole skill phrases
 vectorizer = TfidfVectorizer(
-    stop_words='english',
-    ngram_range=(1, 2),
+    stop_words=None,        # don't remove stop words — skills like "r" would get removed
+    ngram_range=(1, 1),     # single tokens only — each token is already a full skill
     max_features=5000
 )
 
-tfidf_matrix = vectorizer.fit_transform(title_skills['Skills'])
+tfidf_matrix = vectorizer.fit_transform(title_skills['Skills_clean'])
 feature_names = vectorizer.get_feature_names_out()
 
-# Top 5 most distinctive skills per title
+# Convert underscores back to spaces for display
 def get_top_terms(title_idx, top_n=5):
     row = tfidf_matrix[title_idx].toarray()[0]
     top_indices = row.argsort()[::-1][:top_n]
-    return [(feature_names[i], round(row[i], 4)) for i in top_indices if row[i] > 0]
+    return [(feature_names[i].replace('_', ' '), round(row[i], 4)) 
+            for i in top_indices if row[i] > 0]
 
 for idx, row in title_skills.iterrows():
     print(f"\n--- {row['Title']} ---")
