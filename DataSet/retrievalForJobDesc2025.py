@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 #Generate your own api key
 os.environ['KAGGLE_USERNAME'] = 'username'
@@ -60,14 +61,40 @@ hard_skills = [
 skill_counts = skills_series.value_counts()
 hard_skill_counts = skill_counts[skill_counts.index.isin(hard_skills)]
 
-print("\nTop 30 hard/technical skills:")
-print(hard_skill_counts.head(30))
+# print("\nTop 30 hard/technical skills:")
+# print(hard_skill_counts.head(30))
 
 hard_skill_pct = (hard_skill_counts.head(30) / len(df_tech) * 100).round(1)
 hard_skill_pct = hard_skill_pct.astype(str) + '%'
 
-print("\nTop 30 hard/technical skills (% of tech job postings):")
-print(hard_skill_pct.to_string())
+# print("\nTop 30 hard/technical skills (% of tech job postings):")
+# print(hard_skill_pct.to_string())
 
-#Extract Keywords
+# Extract what skills are most prominent in what jobs
+df['Skills'] = df['Skills'].str.replace(';', ' ', regex=False)
 
+# Group skills by job title
+title_skills = df.groupby('Title')['Skills'].apply(
+    lambda x: ' '.join(x.dropna())
+).reset_index()
+
+# Apply TF-IDF
+vectorizer = TfidfVectorizer(
+    stop_words='english',
+    ngram_range=(1, 2),
+    max_features=5000
+)
+
+tfidf_matrix = vectorizer.fit_transform(title_skills['Skills'])
+feature_names = vectorizer.get_feature_names_out()
+
+# Top 5 most distinctive skills per title
+def get_top_terms(title_idx, top_n=5):
+    row = tfidf_matrix[title_idx].toarray()[0]
+    top_indices = row.argsort()[::-1][:top_n]
+    return [(feature_names[i], round(row[i], 4)) for i in top_indices if row[i] > 0]
+
+for idx, row in title_skills.iterrows():
+    print(f"\n--- {row['Title']} ---")
+    for term, score in get_top_terms(idx):
+        print(f"  {term}: {score}")
